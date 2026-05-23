@@ -24,7 +24,10 @@ function deleteItemIndex(arr, id) {
 app.use(bodyParser.json());
 app.use(cors(
   {
-    origin: ["https://mern-todo-mayank.vercel.app"],
+    origin: [
+      "https://mern-todo-mayank.vercel.app",
+      "http://localhost:5173",
+    ],
   }
 ));
 
@@ -48,7 +51,8 @@ app.post('/todos', (req, res) => {
   var newTodo = {
     id: counter++,
     title: req.body.title,
-    description: req.body.description
+    description: req.body.description,
+    completed: false
   }
   todo.push(newTodo)
   res.status(201).send(newTodo)
@@ -72,6 +76,9 @@ app.put('/todos/:id', (req, res) => {
     }
     if (req.body.description) {
       todo[todoIndex].description = req.body.description
+    }
+    if (typeof req.body.completed === 'boolean') {
+      todo[todoIndex].completed = req.body.completed
     }
     res.status(200).json(todo)
   }

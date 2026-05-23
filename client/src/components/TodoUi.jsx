@@ -2,13 +2,14 @@ import React, { useState } from 'react';
 import { Card } from '@mui/material';
 import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
+import { API_BASE_URL } from '../config';
 
 function TodoUi({ darkMode, setTodos }) {
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
 
     const handleTodo = (title, description) => {
-        fetch("https://mern-todo-api-livid.vercel.app/todos", {
+        fetch(`${API_BASE_URL}/todos`, {
             method: "POST",
             headers: {
                 'Content-Type': 'application/json'
@@ -19,7 +20,7 @@ function TodoUi({ darkMode, setTodos }) {
             })
         }).then((resp) => {
             // Fetch the updated list of todos after adding a new todo
-            fetch("https://mern-todo-api-livid.vercel.app/todos", {
+            fetch(`${API_BASE_URL}/todos`, {
                 method: "GET",
             }).then((resp) => {
                 resp.json().then((data) => {

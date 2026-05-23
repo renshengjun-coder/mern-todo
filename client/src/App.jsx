@@ -4,10 +4,12 @@ import TodoUi from "./components/TodoUi";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
 import AddTodo from "./components/AddTodo";
+import { API_BASE_URL } from "./config";
 
 function App() {
   const [darkMode, setDarkMode] = useState(false);
-  const [todos, setTodos] = useState({});
+  const [todos, setTodos] = useState([]);
+  const [filter, setFilter] = useState("all");
   const darkTheme = createTheme({
     palette: {
       mode: darkMode ? "dark" : "light",
@@ -15,7 +17,7 @@ function App() {
   });
 
   useEffect(() => {
-    fetch("https://mern-todo-api-livid.vercel.app/todos", {
+    fetch(`${API_BASE_URL}/todos`, {
       method: "GET",
     }).then((resp) => {
       resp.json().then((data) => {
@@ -35,7 +37,12 @@ function App() {
           change={() => setDarkMode(!darkMode)}
         />
         <TodoUi darkMode={darkMode} setTodos={setTodos} />
-        <AddTodo todos={todos} setTodos={setTodos} />
+        <AddTodo
+          todos={todos}
+          setTodos={setTodos}
+          filter={filter}
+          setFilter={setFilter}
+        />
       </div>
     </ThemeProvider>
   );
