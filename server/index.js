@@ -1,5 +1,4 @@
 const express = require('express');
-const bodyParser = require('body-parser');
 const path = require('path');
 const cors = require('cors');
 const { testConnection } = require('./config/database');
@@ -7,7 +6,7 @@ const todosRouter = require('./routes/todos');
 
 const app = express();
 
-app.use(bodyParser.json());
+app.use(express.json());
 app.use(
   cors({
     origin: [
