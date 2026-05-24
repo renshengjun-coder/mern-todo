@@ -10,6 +10,7 @@ function App() {
   const [darkMode, setDarkMode] = useState(false);
   const [todos, setTodos] = useState([]);
   const [filter, setFilter] = useState("all");
+  const [sort, setSort] = useState("newest");
   const darkTheme = createTheme({
     palette: {
       mode: darkMode ? "dark" : "light",
@@ -42,6 +43,8 @@ function App() {
           setTodos={setTodos}
           filter={filter}
           setFilter={setFilter}
+          sort={sort}
+          setSort={setSort}
         />
       </div>
     </ThemeProvider>
