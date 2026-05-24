@@ -58,6 +58,39 @@ test('updateById returns null when id missing', async () => {
   assert.equal(result, null);
 });
 
+test('create with dueDate persists and returns dueDate', async () => {
+  const created = await todosRepository.create({
+    title: 'Due soon',
+    description: '',
+    dueDate: '2026-06-01T12:00:00',
+  });
+  assert.equal(created.dueDate, '2026-06-01T12:00:00');
+
+  const found = await todosRepository.findById(created.id);
+  assert.equal(found.dueDate, '2026-06-01T12:00:00');
+});
+
+test('create without dueDate returns dueDate null', async () => {
+  const created = await todosRepository.create({
+    title: 'No deadline',
+    description: '',
+  });
+  assert.equal(created.dueDate, null);
+});
+
+test('updateById clears dueDate with null', async () => {
+  const created = await todosRepository.create({
+    title: 'Clear me',
+    description: '',
+    dueDate: '2026-06-01T12:00:00',
+  });
+
+  const updated = await todosRepository.updateById(created.id, {
+    dueDate: null,
+  });
+  assert.equal(updated.dueDate, null);
+});
+
 test('deleteById removes row', async () => {
   const created = await todosRepository.create({
     title: 'To delete',

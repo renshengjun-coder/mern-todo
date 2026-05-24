@@ -1,24 +1,34 @@
 const { pool } = require('../config/database');
 
+function formatDueDateTime(value) {
+  if (value == null) return null;
+  if (typeof value === 'string') {
+    return value.trim().replace(' ', 'T').slice(0, 19);
+  }
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}T${pad(value.getHours())}:${pad(value.getMinutes())}:${pad(value.getSeconds())}`;
+}
+
 function mapRowToTodo(row) {
   return {
     id: row.id,
     title: row.title,
     description: row.description,
     completed: Boolean(row.completed),
+    dueDate: formatDueDateTime(row.due_date),
   };
 }
 
 async function findAll() {
   const [rows] = await pool.query(
-    'SELECT id, title, description, completed FROM todos ORDER BY id ASC'
+    'SELECT id, title, description, completed, due_date FROM todos ORDER BY id ASC'
   );
   return rows.map(mapRowToTodo);
 }
 
 async function findById(id) {
   const [rows] = await pool.query(
-    'SELECT id, title, description, completed FROM todos WHERE id = ?',
+    'SELECT id, title, description, completed, due_date FROM todos WHERE id = ?',
     [id]
   );
   if (rows.length === 0) {
@@ -27,15 +37,15 @@ async function findById(id) {
   return mapRowToTodo(rows[0]);
 }
 
-async function create({ title, description }) {
+async function create({ title, description, dueDate = null }) {
   const [result] = await pool.query(
-    'INSERT INTO todos (title, description, completed) VALUES (?, ?, 0)',
-    [title, description ?? '']
+    'INSERT INTO todos (title, description, completed, due_date) VALUES (?, ?, 0, ?)',
+    [title, description ?? '', dueDate]
   );
   return findById(result.insertId);
 }
 
-async function updateById(id, { title, description, completed }) {
+async function updateById(id, { title, description, completed, dueDate }) {
   const existing = await findById(id);
   if (!existing) {
     return null;
@@ -55,6 +65,10 @@ async function updateById(id, { title, description, completed }) {
   if (completed !== undefined) {
     fields.push('completed = ?');
     values.push(completed ? 1 : 0);
+  }
+  if (dueDate !== undefined) {
+    fields.push('due_date = ?');
+    values.push(dueDate);
   }
 
   if (fields.length === 0) {

@@ -11,6 +11,7 @@ function buildPoolConfig() {
     database: process.env.DB_NAME,
     waitForConnections: true,
     connectionLimit: 10,
+    dateStrings: ['DATE', 'DATETIME'],
   };
 
   if (process.env.DB_SSL === 'true') {

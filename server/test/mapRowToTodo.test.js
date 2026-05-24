@@ -14,6 +14,7 @@ test('mapRowToTodo converts completed TINYINT 1 to true', () => {
     title: 'Buy milk',
     description: '2%',
     completed: true,
+    dueDate: null,
   });
 });
 
@@ -25,4 +26,27 @@ test('mapRowToTodo converts completed TINYINT 0 to false', () => {
     completed: 0,
   });
   assert.equal(todo.completed, false);
+  assert.equal(todo.dueDate, null);
+});
+
+test('mapRowToTodo maps due_date datetime string to dueDate', () => {
+  const todo = mapRowToTodo({
+    id: 3,
+    title: 'Deadline',
+    description: '',
+    completed: 0,
+    due_date: '2026-05-24 17:00:00',
+  });
+  assert.equal(todo.dueDate, '2026-05-24T17:00:00');
+});
+
+test('mapRowToTodo maps null due_date to dueDate null', () => {
+  const todo = mapRowToTodo({
+    id: 4,
+    title: 'No date',
+    description: '',
+    completed: 0,
+    due_date: null,
+  });
+  assert.equal(todo.dueDate, null);
 });
