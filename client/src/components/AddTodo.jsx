@@ -4,22 +4,33 @@ import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import Checkbox from '@mui/material/Checkbox';
 import Typography from '@mui/material/Typography';
+import Chip from '@mui/material/Chip';
 import { API_BASE_URL } from '../config';
+import { isOverdue, formatDueDate, compareDueDates, normalizeDateTimeLocal } from '../utils/dates.js';
 
-function AddTodo({ todos, setTodos, filter, setFilter }) {
+function AddTodo({ todos, setTodos, filter, setFilter, sort, setSort }) {
     const [editMode, setEditMode] = useState(false);
     const [editId, setEditId] = useState(null);
     const [updatedTitle, setUpdatedTitle] = useState('');
     const [updatedDescription, setUpdatedDescription] = useState('');
+    const [updatedDueDate, setUpdatedDueDate] = useState('');
 
     if (!Array.isArray(todos)) {
         return null;
     }
 
-    const visibleTodos = todos.filter((todo) => {
+    const filtered = todos.filter((todo) => {
         if (filter === 'active') return !todo.completed;
         if (filter === 'completed') return todo.completed;
+        if (filter === 'overdue') return isOverdue(todo.dueDate, todo.completed);
         return true;
+    });
+
+    const visibleTodos = [...filtered].sort((a, b) => {
+        if (sort === 'dueDate') {
+            return compareDueDates(a, b);
+        }
+        return b.id - a.id;
     });
 
     const handleDel = (id) => {
@@ -27,10 +38,7 @@ function AddTodo({ todos, setTodos, filter, setFilter }) {
             method: 'DELETE'
         }).then((resp) => {
             resp.json().then((data) => {
-                console.log("Deleted data:", data); // Check the data returned by the API
-                const updatedTodos = data; // Make sure data is the updated list of todos
-                console.log("Updated todos:", updatedTodos); // Verify the updated todos
-                setTodos(updatedTodos); // Update the todos state with the new array
+                setTodos(data);
             });
         });
     }
@@ -43,14 +51,12 @@ function AddTodo({ todos, setTodos, filter, setFilter }) {
             },
             body: JSON.stringify({
                 title: updatedTitle,
-                description: updatedDescription
+                description: updatedDescription,
+                dueDate: normalizeDateTimeLocal(updatedDueDate) || null,
             })
         }).then((resp) => {
             resp.json().then((data) => {
-                console.log("Updated data:", data);
-                const updatedTodos = data;
-                console.log("Updated todos:", updatedTodos);
-                setTodos(updatedTodos);
+                setTodos(data);
                 setEditMode(false);
                 setEditId(null);
             });
@@ -73,9 +79,17 @@ function AddTodo({ todos, setTodos, filter, setFilter }) {
         });
     }
 
+    const startEdit = (todo) => {
+        setEditMode(true);
+        setEditId(todo.id);
+        setUpdatedTitle(todo.title);
+        setUpdatedDescription(todo.description);
+        setUpdatedDueDate(todo.dueDate ?? '');
+    };
+
     return (
         <>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 12, paddingTop: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 12, paddingTop: 20, flexWrap: 'wrap' }}>
                 <Button
                     variant={filter === 'all' ? 'contained' : 'outlined'}
                     onClick={() => setFilter('all')}
@@ -93,6 +107,26 @@ function AddTodo({ todos, setTodos, filter, setFilter }) {
                     onClick={() => setFilter('completed')}
                 >
                     Completed
+                </Button>
+                <Button
+                    variant={filter === 'overdue' ? 'contained' : 'outlined'}
+                    onClick={() => setFilter('overdue')}
+                >
+                    Overdue
+                </Button>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 12, paddingTop: 12, flexWrap: 'wrap' }}>
+                <Button
+                    variant={sort === 'newest' ? 'contained' : 'outlined'}
+                    onClick={() => setSort('newest')}
+                >
+                    Newest first
+                </Button>
+                <Button
+                    variant={sort === 'dueDate' ? 'contained' : 'outlined'}
+                    onClick={() => setSort('dueDate')}
+                >
+                    Due date soonest first
                 </Button>
             </div>
             {visibleTodos.map((todo) => (
@@ -121,6 +155,24 @@ function AddTodo({ todos, setTodos, filter, setFilter }) {
                                     value={updatedDescription}
                                     onChange={e => setUpdatedDescription(e.target.value)}
                                 />
+                                <div style={{ paddingTop: 12 }}>
+                                    <label htmlFor={`edit-due-${todo.id}`}>Due date & time</label>
+                                    <input
+                                        id={`edit-due-${todo.id}`}
+                                        type="datetime-local"
+                                        step="1"
+                                        value={updatedDueDate}
+                                        onChange={(e) => setUpdatedDueDate(e.target.value)}
+                                        style={{ width: '100%', padding: 8, marginTop: 4, boxSizing: 'border-box' }}
+                                    />
+                                    <Button
+                                        size="small"
+                                        onClick={() => setUpdatedDueDate('')}
+                                        sx={{ mt: 1 }}
+                                    >
+                                        Clear date & time
+                                    </Button>
+                                </div>
                             </>
                         ) : (
                             <>
@@ -149,6 +201,27 @@ function AddTodo({ todos, setTodos, filter, setFilter }) {
                                 >
                                     {todo.description}
                                 </Typography>
+                                {todo.dueDate && (
+                                    <Typography
+                                        variant="body2"
+                                        sx={{
+                                            margin: 1,
+                                            color: isOverdue(todo.dueDate, todo.completed)
+                                                ? 'error.main'
+                                                : 'text.secondary',
+                                        }}
+                                    >
+                                        {formatDueDate(todo.dueDate)}
+                                        {isOverdue(todo.dueDate, todo.completed) && (
+                                            <Chip
+                                                label="Overdue"
+                                                color="error"
+                                                size="small"
+                                                sx={{ ml: 1 }}
+                                            />
+                                        )}
+                                    </Typography>
+                                )}
                             </>
                         )}
                     </Paper>
@@ -157,7 +230,7 @@ function AddTodo({ todos, setTodos, filter, setFilter }) {
                         {editMode && editId === todo.id ? (
                             <Button onClick={() => handleEdit(todo.id)} variant="contained" color="success">Save</Button>
                         ) : (
-                            <Button onClick={() => { setEditMode(true); setEditId(todo.id); setUpdatedTitle(todo.title); setUpdatedDescription(todo.description); }} variant="contained" color="success">Edit</Button>
+                            <Button onClick={() => startEdit(todo)} variant="contained" color="success">Edit</Button>
                         )}
                     </div >
                 </div>

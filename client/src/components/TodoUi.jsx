@@ -3,29 +3,35 @@ import { Card } from '@mui/material';
 import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import { API_BASE_URL } from '../config';
+import { normalizeDateTimeLocal } from '../utils/dates.js';
 
 function TodoUi({ darkMode, setTodos }) {
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
+    const [dueDate, setDueDate] = useState('');
 
-    const handleTodo = (title, description) => {
+    const handleTodo = () => {
+        const body = { title, description };
+        const normalized = normalizeDateTimeLocal(dueDate);
+        if (normalized) {
+            body.dueDate = normalized;
+        }
+
         fetch(`${API_BASE_URL}/todos`, {
             method: "POST",
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                title: title,
-                description: description
-            })
+            body: JSON.stringify(body)
         }).then((resp) => {
-            // Fetch the updated list of todos after adding a new todo
             fetch(`${API_BASE_URL}/todos`, {
                 method: "GET",
             }).then((resp) => {
                 resp.json().then((data) => {
-                    console.log(data)
-                    setTodos(data)
+                    setTodos(data);
+                    setTitle('');
+                    setDescription('');
+                    setDueDate('');
                 });
             });
         })
@@ -68,9 +74,21 @@ function TodoUi({ darkMode, setTodos }) {
                             }
                         }}
                     />
+                    <div style={{ paddingTop: 16 }} />
+                    <label htmlFor="create-due-date" style={{ display: 'block', marginBottom: 8 }}>
+                        Due date & time (optional)
+                    </label>
+                    <input
+                        id="create-due-date"
+                        type="datetime-local"
+                        step="1"
+                        value={dueDate}
+                        onChange={(e) => setDueDate(e.target.value)}
+                        style={{ width: '100%', padding: 8, boxSizing: 'border-box' }}
+                    />
                 </div>
                 <div style={{ textAlign: 'center', paddingBottom: 16 }}>
-                    <Button variant="contained" onClick={() => handleTodo(title, description)} sx={{
+                    <Button variant="contained" onClick={handleTodo} sx={{
                         backgroundColor: '#942fad',
                         color: darkMode ? 'white' : 'white',
                         ":hover": {
