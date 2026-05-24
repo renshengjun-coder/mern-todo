@@ -2,7 +2,7 @@
 
 **Document ID:** PRD-001  
 **Date:** 2026-05-24  
-**Status:** Draft  
+**Status:** Draft (amended 2026-05-24 — datetime precision)  
 **Author:** Product (practice requirement)  
 **Target release:** mern-todo vNext  
 **Related work:** Independent of MySQL persistence (PRD can ship against in-memory or MySQL storage)
@@ -11,7 +11,7 @@
 
 ## 1. Summary
 
-Add optional due dates to todos so users can plan work by deadline. The app should display due dates clearly, highlight overdue incomplete items, support sorting by due date, and optionally filter to overdue items only.
+Add optional due **date-times** to todos so users can plan work by deadline with **second-level** accuracy. The app should display due date-times clearly, highlight overdue incomplete items when the current moment passes the deadline, support sorting by due date-time, and optionally filter to overdue items only.
 
 This is a full-stack enhancement to the existing MERN todo app. It builds on current CRUD, completion toggling, and All / Active / Completed filters without changing those behaviors.
 
@@ -36,7 +36,8 @@ Users can create, edit, complete, and delete todos, but there is no way to attac
 
 ## 4. Non-goals (out of scope)
 
-- Time-of-day or timezone-aware scheduling (dates are calendar-day only)
+- Timezone conversion or multi-region scheduling (due date-times are **local wall-clock** values; no `Z` / offset suffix on the API)
+- Sub-second precision (milliseconds not required)
 - Email, push, or in-app reminders
 - Recurring / repeating todos
 - MySQL schema migration (handled by separate database initiative)
@@ -53,8 +54,8 @@ Users can create, edit, complete, and delete todos, but there is no way to attac
 
 | ID | Story | Priority |
 |----|-------|----------|
-| US-1 | As a user, I want to optionally set a due date when creating a todo so I can track when it should be done. | Must have |
-| US-2 | As a user, I want to see the due date on each todo card so I know the deadline at a glance. | Must have |
+| US-1 | As a user, I want to optionally set a due date **and time** (to the second) when creating a todo so I can track when it should be done. | Must have |
+| US-2 | As a user, I want to see the due date-time on each todo card so I know the deadline at a glance. | Must have |
 | US-3 | As a user, I want overdue incomplete todos to stand out visually so I can prioritize them. | Must have |
 | US-4 | As a user, I want to edit or clear a todo's due date so I can adjust plans. | Must have |
 | US-5 | As a user, I want to sort todos by due date (soonest first) so urgent items appear on top. | Must have |
@@ -104,13 +105,20 @@ Extend the todo object:
   "title": "Example",
   "description": "Details",
   "completed": false,
-  "dueDate": "2026-05-24"
+  "dueDate": "2026-05-24T17:30:00"
 }
 ```
 
 | Field | Type | Required | Default | Notes |
 |-------|------|----------|---------|-------|
-| `dueDate` | `string \| null` | No | `null` | ISO 8601 calendar date `YYYY-MM-DD`; no time component |
+| `dueDate` | `string \| null` | No | `null` | Local wall-clock datetime `YYYY-MM-DDTHH:mm:ss` (seconds required); no timezone offset |
+
+**Format rules**
+
+- Pattern: `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$`
+- Hours `00–23`, minutes/seconds `00–59`
+- Semantically invalid values (e.g. `2026-02-30T12:00:00`) are rejected
+- Date-only strings (`YYYY-MM-DD`) are **not** accepted after this amendment
 
 ### 7.2 Overdue definition
 
@@ -118,9 +126,18 @@ A todo is **overdue** when **all** of the following are true:
 
 1. `completed === false`
 2. `dueDate` is not `null`
-3. `dueDate` is strictly before today's calendar date in the user's local timezone
+3. The parsed due date-time is **strictly before** the current date-time in the user's **local** environment, compared at **second** precision
 
-Completed todos are never overdue. Todos due **today** are not overdue.
+Completed todos are never overdue. A todo due later **today** (e.g. 5:00 PM when it is 2:00 PM) is **not** overdue.
+
+**Examples** (local time, `now = 2026-05-24T14:00:00`):
+
+| `dueDate` | Overdue? |
+|-----------|----------|
+| `2026-05-24T13:59:59` | Yes |
+| `2026-05-24T14:00:00` | No (not strictly before now) |
+| `2026-05-24T18:00:00` | No |
+| `2026-05-23T23:59:59` | Yes |
 
 ### 7.3 Sort behavior
 
@@ -136,7 +153,7 @@ Completed todos are never overdue. Todos due **today** are not overdue.
 Add an **Overdue** filter alongside All / Active / Completed:
 
 - Shows todos where overdue definition (§7.2) is true
-- Hides completed todos and todos without a due date in the future or today
+- Hides completed todos and todos whose due date-time is still in the future (or exactly now)
 
 ---
 
@@ -149,9 +166,9 @@ Add an **Overdue** filter alongside All / Active / Completed:
 | FR-B1 | `POST /todos` accepts optional `dueDate` in the request body. |
 | FR-B2 | New todos default to `dueDate: null` when the field is omitted. |
 | FR-B3 | `PUT /todos/:id` accepts `dueDate` updates, including setting the value to `null` to clear the date. |
-| FR-B4 | `dueDate` must be `null` or match `YYYY-MM-DD` (regex: `^\d{4}-\d{2}-\d{2}$`). |
-| FR-B5 | Invalid `dueDate` values return HTTP `400` with a JSON body such as `{ "error": "Invalid dueDate; expected YYYY-MM-DD or null" }`. |
-| FR-B6 | Semantically invalid calendar dates (e.g. `2026-02-30`) return HTTP `400`. |
+| FR-B4 | `dueDate` must be `null` or match `YYYY-MM-DDTHH:mm:ss` (regex: `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$`). |
+| FR-B5 | Invalid `dueDate` values return HTTP `400` with a JSON body such as `{ "error": "Invalid dueDate; expected YYYY-MM-DDTHH:mm:ss or null" }`. |
+| FR-B6 | Semantically invalid date-times (e.g. `2026-02-30T12:00:00`, `2026-05-24T25:00:00`) return HTTP `400`. |
 | FR-B7 | `GET /todos` and single-todo responses include `dueDate` on every todo object. |
 | FR-B8 | Existing PUT partial-update behavior for `title`, `description`, and `completed` remains unchanged. |
 
@@ -159,7 +176,7 @@ Add an **Overdue** filter alongside All / Active / Completed:
 
 | ID | Requirement |
 |----|-------------|
-| FR-F1 | Add an optional date input to the create form. |
+| FR-F1 | Add an optional date-time input to the create form (second precision). |
 | FR-F2 | User may submit without selecting a date; empty means no due date sent. |
 | FR-F3 | On successful create, the new todo appears in the list with its due date if set. |
 | FR-F4 | Create form clears the date field after successful submission. |
@@ -168,7 +185,7 @@ Add an **Overdue** filter alongside All / Active / Completed:
 
 | ID | Requirement |
 |----|-------------|
-| FR-F5 | Display formatted due date on each card when `dueDate` is set (e.g. "Due May 24, 2026"). |
+| FR-F5 | Display formatted due date-time on each card when `dueDate` is set (e.g. "Due May 24, 2026, 5:30:00 PM"). |
 | FR-F6 | Apply overdue styling when §7.2 applies (e.g. red text, "Overdue" badge/chip). |
 | FR-F7 | In edit mode, user can set, change, or clear the due date. |
 | FR-F8 | Provide an explicit way to clear due date in edit mode (empty picker or "Clear date" control). |
@@ -198,7 +215,7 @@ Add an **Overdue** filter alongside All / Active / Completed:
 | UX-1 | Due date text uses secondary typography when not overdue. |
 | UX-2 | Overdue todos use error/destructive color from the Material UI theme (works in light and dark mode). |
 | UX-3 | Overdue indicator includes both color and a text label (not color alone) for accessibility. |
-| UX-4 | Date input uses native `<input type="date">` unless brainstorming selects MUI DatePicker (avoid new dependencies unless approved). |
+| UX-4 | Date-time input uses native `<input type="datetime-local" step="1">` for second precision (no new dependencies). |
 | UX-5 | Sort and filter controls follow the existing button group pattern in `AddTodo.jsx`. |
 
 ---
@@ -213,7 +230,7 @@ Add an **Overdue** filter alongside All / Active / Completed:
 {
   "title": "Finish report",
   "description": "Q2 summary",
-  "dueDate": "2026-05-30"
+  "dueDate": "2026-05-30T17:00:00"
 }
 ```
 
@@ -225,7 +242,7 @@ Add an **Overdue** filter alongside All / Active / Completed:
   "title": "Finish report",
   "description": "Q2 summary",
   "completed": false,
-  "dueDate": "2026-05-30"
+  "dueDate": "2026-05-30T17:00:00"
 }
 ```
 
@@ -245,7 +262,7 @@ Add an **Overdue** filter alongside All / Active / Completed:
 
 ```json
 {
-  "error": "Invalid dueDate; expected YYYY-MM-DD or null"
+  "error": "Invalid dueDate; expected YYYY-MM-DDTHH:mm:ss or null"
 }
 ```
 
@@ -255,13 +272,13 @@ Add an **Overdue** filter alongside All / Active / Completed:
 
 ### Backend validation approach
 
-1. Reject wrong format with regex.
-2. Parse with `Date` or manual components; reject invalid calendar dates.
-3. Store and return the original `YYYY-MM-DD` string (no timezone conversion on the server).
+1. Reject wrong format with regex (`YYYY-MM-DDTHH:mm:ss` only).
+2. Parse year/month/day/hour/minute/second; reject invalid calendar date-times.
+3. Store and return the canonical `YYYY-MM-DDTHH:mm:ss` string (no timezone conversion on the server).
 
-### MySQL compatibility (future)
+### MySQL compatibility
 
-When MySQL persistence is enabled, `dueDate` maps to a nullable `DATE` column. This PRD does not include migration DDL; the database spec should add `due_date DATE NULL` in a follow-up change.
+`dueDate` maps to a nullable `DATETIME` column (`due_date DATETIME NULL`). Existing `DATE` values from an earlier rollout must be migrated (see design spec): convert to `DATETIME` and normalize legacy date-only rows to end-of-day `23:59:59` so same-day deadlines are not immediately overdue at midnight.
 
 ### Dark mode
 
@@ -274,8 +291,9 @@ Overdue styling must remain readable when `App.jsx` dark theme is active. Prefer
 ### Must pass before release
 
 - [ ] Create todo without due date → `dueDate` is `null`; behavior matches today
-- [ ] Create todo with future due date → date displays on card
-- [ ] Create todo with past due date → overdue styling appears immediately
+- [ ] Create todo with future due date-time → date-time displays on card (includes time to the second)
+- [ ] Create todo with past due date-time → overdue styling appears immediately
+- [ ] Todo due later today → not overdue until that second passes
 - [ ] Toggle todo complete → overdue styling removed even if date is in the past
 - [ ] Edit todo to add, change, and clear due date → persists after list refresh
 - [ ] Sort "Due date soonest first" → earliest dates first; undated todos last
@@ -300,13 +318,16 @@ Overdue styling must remain readable when `App.jsx` dark theme is active. Prefer
 
 ### Overdue edge cases to test
 
-| dueDate | completed | Today | Expected overdue |
-|---------|-----------|-------|------------------|
-| `null` | `false` | any | No |
-| today | `false` | today | No |
-| yesterday | `false` | today | Yes |
-| yesterday | `true` | today | No |
-| tomorrow | `false` | today | No |
+Assume `now = 2026-05-24T14:00:00` (local).
+
+| dueDate | completed | Expected overdue |
+|---------|-----------|------------------|
+| `null` | `false` | No |
+| `2026-05-24T14:00:00` | `false` | No |
+| `2026-05-24T13:59:59` | `false` | Yes |
+| `2026-05-24T18:00:00` | `false` | No |
+| `2026-05-23T23:59:59` | `false` | Yes |
+| `2026-05-23T23:59:59` | `true` | No |
 
 ---
 
@@ -332,7 +353,9 @@ Suggested file touch list:
 | # | Decision | Options | Recommendation |
 |---|----------|---------|----------------|
 | D1 | Sort location | Client-only vs `GET /todos?sort=dueDate` | Client-only for v1 |
-| D2 | Date input component | Native `<input type="date">` vs MUI DatePicker | Native input (no new deps) |
+| D2 | Date-time input | Native `datetime-local` vs MUI DateTimePicker | Native `datetime-local` with `step="1"` |
+| D5 | Datetime format | `YYYY-MM-DDTHH:mm:ss` local vs UTC ISO | Local wall-clock `YYYY-MM-DDTHH:mm:ss` (amendment 0.2) |
+| D6 | Legacy DATE migration | Midnight vs end-of-day | End-of-day `23:59:59` for existing date-only rows |
 | D3 | Overdue filter | Include in v1 vs defer | Include (should have) |
 | D4 | Clear date UX | Empty picker vs explicit "Clear date" button | Explicit clear in edit mode |
 
@@ -351,3 +374,4 @@ Suggested file touch list:
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 0.1 | 2026-05-24 | — | Initial draft PRD |
+| 0.2 | 2026-05-24 | — | **Amendment:** `dueDate` is date-time with second precision (`YYYY-MM-DDTHH:mm:ss`); overdue uses instant comparison, not calendar day |
