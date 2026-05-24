@@ -1,102 +1,70 @@
 const express = require('express');
-const bodyParser = require('body-parser');
 const path = require('path');
-const app = express();
 const cors = require('cors');
+const { testConnection, pool } = require('./config/database');
+const todosRouter = require('./routes/todos');
 
-function findIndex(arr, id) {
-  for (var i of arr) {
-    if (i.id == id) return arr.indexOf(i);
+const app = express();
 
-  }
-  return -1;
-
-}
-
-function deleteItemIndex(arr, id) {
-  var newTodo = []
-  for (var i = 0; i < arr.length; i++) {
-    if (arr[i].id !== id) newTodo.push(arr[i]);
-  }
-  return newTodo;
-}
-
-app.use(bodyParser.json());
-app.use(cors(
-  {
+app.use(express.json());
+app.use(
+  cors({
     origin: [
-      "https://mern-todo-mayank.vercel.app",
-      "http://localhost:5173",
+      'https://mern-todo-mayank.vercel.app',
+      'http://localhost:5173',
     ],
-  }
-));
+  })
+);
 
-var todo = []
-
-app.get('/todos', (req, res) => {
-  res.status(200).send(todo);
-})
-
-app.get('/todos/:id', (req, res) => {
-  var todoIndex = findIndex(todo, parseInt(req.params.id));
-  if (todoIndex === -1) {
-    res.status(404).send();
-  } else {
-    res.json(todo[todoIndex]);
-  }
-});
-var counter = 1;
-app.post('/todos', (req, res) => {
-
-  var newTodo = {
-    id: counter++,
-    title: req.body.title,
-    description: req.body.description,
-    completed: false
-  }
-  todo.push(newTodo)
-  res.status(201).send(newTodo)
-})
-
-app.delete('/todos/:id', (req, res) => {
-  const id = parseInt(req.params.id);
-  todo = deleteItemIndex(todo, id);
-
-  res.status(200).json(todo);
-})
-
-app.put('/todos/:id', (req, res) => {
-  const todoIndex = findIndex(todo, parseInt(req.params.id));
-  if (todoIndex === -1) {
-    res.status(404).send('Todo item not found.');
-  } else {
-
-    if (req.body.title) {
-      todo[todoIndex].title = req.body.title
-    }
-    if (req.body.description) {
-      todo[todoIndex].description = req.body.description
-    }
-    if (typeof req.body.completed === 'boolean') {
-      todo[todoIndex].completed = req.body.completed
-    }
-    res.status(200).json(todo)
-  }
-})
+app.use('/todos', todosRouter);
 
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'))
-})
-
-
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
 
 app.use('*', (req, res) => {
-  res.status(404).send('Route not defined')
-})
+  res.status(404).send('Route not defined');
+});
 
+app.use((err, req, res, next) => {
+  console.error(err);
+  res.status(500).json({ error: 'Internal server error' });
+});
 
-app.listen(3000, () => {
-  console.log(`Listening at http://localhost:3000`)
-})
+let server;
+
+async function shutdown(signal) {
+  console.log(`${signal} received, shutting down`);
+  if (server) {
+    await new Promise((resolve) => server.close(resolve));
+  }
+  await pool.end();
+  process.exit(0);
+}
+
+for (const signal of ['SIGINT', 'SIGTERM']) {
+  process.on(signal, () => {
+    shutdown(signal).catch((err) => {
+      console.error('Shutdown failed:', err.message);
+      process.exit(1);
+    });
+  });
+}
+
+async function start() {
+  try {
+    await testConnection();
+    server = app.listen(3000, () => {
+      console.log('Listening at http://localhost:3000');
+    });
+  } catch (err) {
+    console.error('Database connection failed:', err.message);
+    process.exit(1);
+  }
+}
+
+if (require.main === module) {
+  start();
+}
 
 module.exports = app;
