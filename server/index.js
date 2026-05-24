@@ -1,7 +1,7 @@
 const express = require('express');
 const path = require('path');
 const cors = require('cors');
-const { testConnection } = require('./config/database');
+const { testConnection, pool } = require('./config/database');
 const todosRouter = require('./routes/todos');
 
 const app = express();
@@ -31,10 +31,30 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
+let server;
+
+async function shutdown(signal) {
+  console.log(`${signal} received, shutting down`);
+  if (server) {
+    await new Promise((resolve) => server.close(resolve));
+  }
+  await pool.end();
+  process.exit(0);
+}
+
+for (const signal of ['SIGINT', 'SIGTERM']) {
+  process.on(signal, () => {
+    shutdown(signal).catch((err) => {
+      console.error('Shutdown failed:', err.message);
+      process.exit(1);
+    });
+  });
+}
+
 async function start() {
   try {
     await testConnection();
-    app.listen(3000, () => {
+    server = app.listen(3000, () => {
       console.log('Listening at http://localhost:3000');
     });
   } catch (err) {

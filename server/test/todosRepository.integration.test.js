@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('./integrationEnv');
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
