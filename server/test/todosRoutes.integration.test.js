@@ -84,3 +84,26 @@ test('POST /todos accepts valid dueDate', async () => {
     assert.equal(body.dueDate, '2026-06-01T12:00:00');
   });
 });
+
+test('PUT /todos/:id rejects date-only dueDate with 400', async () => {
+  await withServer(async (port) => {
+    const createRes = await fetch(`http://127.0.0.1:${port}/todos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: 'Existing',
+        description: '',
+      }),
+    });
+    const created = await createRes.json();
+
+    const res = await fetch(`http://127.0.0.1:${port}/todos/${created.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dueDate: '2026-06-01' }),
+    });
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.match(body.error, /Invalid dueDate/);
+  });
+});

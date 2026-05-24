@@ -1,5 +1,6 @@
 const express = require('express');
 const todosRepository = require('../repositories/todosRepository');
+const { validateDueDate } = require('../utils/validateDueDate');
 
 const router = express.Router();
 
@@ -28,9 +29,20 @@ router.get('/:id', async (req, res, next) => {
 
 router.post('/', async (req, res, next) => {
   try {
+    let dueDate = null;
+    if ('dueDate' in req.body) {
+      const result = validateDueDate(req.body.dueDate);
+      if (!result.valid) {
+        res.status(400).json({ error: result.error });
+        return;
+      }
+      dueDate = result.value;
+    }
+
     const newTodo = await todosRepository.create({
       title: req.body.title,
       description: req.body.description,
+      dueDate,
     });
     res.status(201).send(newTodo);
   } catch (err) {
@@ -62,6 +74,14 @@ router.put('/:id', async (req, res, next) => {
     }
     if (typeof req.body.completed === 'boolean') {
       updates.completed = req.body.completed;
+    }
+    if ('dueDate' in req.body) {
+      const result = validateDueDate(req.body.dueDate);
+      if (!result.valid) {
+        res.status(400).json({ error: result.error });
+        return;
+      }
+      updates.dueDate = result.value;
     }
 
     const updated = await todosRepository.updateById(id, updates);
