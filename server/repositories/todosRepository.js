@@ -84,6 +84,29 @@ async function deleteById(id) {
   await pool.query('DELETE FROM todos WHERE id = ?', [id]);
 }
 
+async function findTodosPendingReminder() {
+  const [rows] = await pool.query(
+    `SELECT id, title, description, completed, due_date
+     FROM todos
+     WHERE due_date IS NOT NULL
+       AND completed = 0
+       AND reminder_sent_at IS NULL`
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    dueDate: formatDueDateTime(row.due_date),
+  }));
+}
+
+async function markReminderSent(id) {
+  await pool.query(
+    'UPDATE todos SET reminder_sent_at = NOW() WHERE id = ? AND reminder_sent_at IS NULL',
+    [id]
+  );
+}
+
 module.exports = {
   mapRowToTodo,
   findAll,
@@ -91,4 +114,6 @@ module.exports = {
   create,
   updateById,
   deleteById,
+  findTodosPendingReminder,
+  markReminderSent,
 };
