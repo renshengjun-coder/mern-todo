@@ -101,3 +101,43 @@ test('deleteById removes row', async () => {
   const all = await todosRepository.findAll();
   assert.equal(all.length, 0);
 });
+
+test('findTodosPendingReminder excludes completed and sent', async () => {
+  const open = await todosRepository.create({
+    title: 'Open',
+    description: '',
+    dueDate: '2030-01-01T12:00:00',
+  });
+  const done = await todosRepository.create({
+    title: 'Done',
+    description: '',
+    dueDate: '2030-01-01T12:00:00',
+  });
+  await todosRepository.updateById(done.id, { completed: true });
+
+  const pending = await todosRepository.findTodosPendingReminder();
+  const ids = pending.map((t) => t.id);
+  assert.ok(ids.includes(open.id));
+  assert.equal(pending.every((t) => t.dueDate), true);
+});
+
+test('markReminderSent sets reminder_sent_at', async () => {
+  const created = await todosRepository.create({
+    title: 'Remind me',
+    description: '',
+    dueDate: '2030-01-01T12:00:00',
+  });
+  await todosRepository.markReminderSent(created.id);
+
+  const [rows] = await pool.query(
+    'SELECT reminder_sent_at FROM todos WHERE id = ?',
+    [created.id]
+  );
+  assert.notEqual(rows[0].reminder_sent_at, null);
+
+  const pending = await todosRepository.findTodosPendingReminder();
+  assert.equal(
+    pending.some((t) => t.id === created.id),
+    false
+  );
+});
