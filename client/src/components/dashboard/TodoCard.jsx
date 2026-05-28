@@ -20,7 +20,44 @@ import TodoEditDialog from './TodoEditDialog';
 
 export default function TodoCard({ todo, onToggleCompleted, onUpdate, onDelete }) {
   const [editOpen, setEditOpen] = useState(false);
+  const [mutationError, setMutationError] = useState(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [toggling, setToggling] = useState(false);
   const overdue = isOverdue(todo.dueDate, todo.completed);
+
+  const handleToggle = async () => {
+    setMutationError(null);
+    setToggling(true);
+    try {
+      await onToggleCompleted(todo);
+    } catch (err) {
+      setMutationError(err.message || 'Failed to update todo');
+    } finally {
+      setToggling(false);
+    }
+  };
+
+  const handleDelete = async (event) => {
+    event.preventDefault();
+    setDeleteError(null);
+    setDeleting(true);
+    try {
+      await onDelete(todo.id);
+      setDeleteOpen(false);
+    } catch (err) {
+      setDeleteError(err.message || 'Failed to delete todo');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleDeleteOpenChange = (open) => {
+    if (deleting) return;
+    setDeleteOpen(open);
+    if (!open) setDeleteError(null);
+  };
 
   return (
     <>
@@ -33,10 +70,11 @@ export default function TodoCard({ todo, onToggleCompleted, onUpdate, onDelete }
         <CardContent className="flex gap-4 p-5">
           <button
             type="button"
-            onClick={() => onToggleCompleted(todo)}
+            onClick={handleToggle}
+            disabled={toggling}
             aria-label={todo.completed ? 'Mark incomplete' : 'Mark complete'}
             className={cn(
-              'mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2',
+              'mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 disabled:opacity-50',
               todo.completed
                 ? 'border-dashboard-statCompleted bg-dashboard-statCompleted'
                 : 'border-[#d1d5dc]',
@@ -81,6 +119,11 @@ export default function TodoCard({ todo, onToggleCompleted, onUpdate, onDelete }
                 {formatDueDate(todo.dueDate)}
               </p>
             )}
+            {mutationError && (
+              <p className="mt-2 text-sm text-destructive" role="alert">
+                {mutationError}
+              </p>
+            )}
           </div>
           <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
             <Button
@@ -93,7 +136,7 @@ export default function TodoCard({ todo, onToggleCompleted, onUpdate, onDelete }
             >
               <Pencil className="h-4 w-4" />
             </Button>
-            <AlertDialog>
+            <AlertDialog open={deleteOpen} onOpenChange={handleDeleteOpenChange}>
               <AlertDialogTrigger asChild>
                 <Button
                   type="button"
@@ -112,9 +155,20 @@ export default function TodoCard({ todo, onToggleCompleted, onUpdate, onDelete }
                     This action cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
+                {deleteError && (
+                  <p className="text-sm text-destructive" role="alert">
+                    {deleteError}
+                  </p>
+                )}
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => onDelete(todo.id)}>Delete</AlertDialogAction>
+                  <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDelete}
+                    disabled={deleting}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    {deleting ? 'Deleting...' : 'Delete'}
+                  </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
