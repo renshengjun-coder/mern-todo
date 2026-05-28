@@ -1,0 +1,3 @@
+ALTER TABLE todos
+  ADD COLUMN reminder_sent_at DATETIME NULL DEFAULT NULL
+  AFTER due_date;
