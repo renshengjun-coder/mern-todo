@@ -9,7 +9,8 @@
     "test:integration": "node --test test/todosRepository.integration.test.js",
     "start": "nodemon index.js",
     "db:migrate": "node db/migrate.js",
-    "db:migrate:test": "node db/migrate-test.js"
+    "db:migrate:test": "node db/migrate-test.js",
+    "verify:smtp": "node scripts/verify-reminder-smtp.js"
   },
   "keywords": [],
   "author": "",
