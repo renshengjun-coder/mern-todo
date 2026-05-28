@@ -2,6 +2,11 @@ const express = require('express');
 const path = require('path');
 const cors = require('cors');
 const { testConnection, pool } = require('./config/database');
+const { getReminderConfig } = require('./config/reminders');
+const {
+  startReminderScheduler,
+  stopReminderScheduler,
+} = require('./jobs/reminderPoller');
 const todosRouter = require('./routes/todos');
 
 const app = express();
@@ -32,9 +37,12 @@ app.use((err, req, res, next) => {
 });
 
 let server;
+let stopReminders = () => {};
 
 async function shutdown(signal) {
   console.log(`${signal} received, shutting down`);
+  stopReminders();
+  stopReminderScheduler();
   if (server) {
     await new Promise((resolve) => server.close(resolve));
   }
@@ -54,6 +62,8 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
 async function start() {
   try {
     await testConnection();
+    const reminderConfig = getReminderConfig();
+    stopReminders = startReminderScheduler(reminderConfig);
     server = app.listen(3000, () => {
       console.log('Listening at http://localhost:3000');
     });
